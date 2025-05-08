@@ -1,4 +1,4 @@
-name: offile_speech_to_text
+name: app
 description: "A new Flutter project."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
@@ -14,13 +14,14 @@ dependencies:
     sdk: flutter
 
   cupertino_icons: ^1.0.8
+  speech_to_text: ^7.0.0
   # vosk_flutter: ^0.3.48
-  record: ^6.0.0
-  vosk_flutter:
-    git:
-        url: https://github.com/alphacep/vosk-flutter.git
-        ref: master
-  path_provider: ^2.1.5
+  # record: ^6.0.0
+  # vosk_flutter:
+  #   git:
+  #       url: https://github.com/alphacep/vosk-flutter.git
+  #       ref: master
+  # path_provider: ^2.1.5
 
 dev_dependencies:
   flutter_test:

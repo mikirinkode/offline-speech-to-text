@@ -1,5 +1,5 @@
+import 'package:app/home_alt_screen.dart';
 import 'package:flutter/material.dart';
-import 'package:offile_speech_to_text/home_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -17,7 +17,8 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue[900] ?? Colors.blue),
         useMaterial3: true,
       ),
-      home: HomeScreen(),
+      // home: HomeScreen(),
+      home: HomeAltScreen(),
     );
   }
 }
