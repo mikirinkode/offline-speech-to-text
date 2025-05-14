@@ -67,6 +67,13 @@ class _HomeScreenState extends State<HomeScreen> {
     await File(_sampleAudioPath!).writeAsBytes(bytes);
   }
 
+  Future<void> requestMicrophonePermission() async {
+    final status = await Permission.microphone.request();
+    if (status != PermissionStatus.granted) {
+      throw Exception('Microphone permission not granted');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -142,13 +149,6 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     } catch (e) {
       debugPrint("error recording audio: $e");
-    }
-  }
-
-  Future<void> requestMicrophonePermission() async {
-    final status = await Permission.microphone.request();
-    if (status != PermissionStatus.granted) {
-      throw Exception('Microphone permission not granted');
     }
   }
 
