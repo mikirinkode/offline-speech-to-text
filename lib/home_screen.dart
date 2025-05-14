@@ -1,216 +1,228 @@
-// import 'dart:async';
-// import 'dart:convert';
-// import 'dart:io';
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 
-// import 'package:flutter/material.dart';
-// import 'package:path_provider/path_provider.dart';
-// import 'package:vosk_flutter/vosk_flutter.dart';
-// import 'package:record/record.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:record/record.dart';
+import 'package:whisper_flutter_new/whisper_flutter_new.dart';
 
-// class HomeScreen extends StatefulWidget {
-//   const HomeScreen({super.key});
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
 
-//   @override
-//   State<HomeScreen> createState() => _HomeScreenState();
-// }
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
 
-// class _HomeScreenState extends State<HomeScreen> {
-//   static const _modelPath = 'assets/models/vosk-model-small-en-us-0.15.zip';
-//   static const _sampleRate = 16000;
+class _HomeScreenState extends State<HomeScreen> {
+  final _recorder = AudioRecorder();
+  bool _isModelInitialized = false;
+  bool _isListening = false;
+  bool _isProcessing = false;
+  Duration? _processingDuration;
+  String _fullTranscript = "";
+  String? _sampleAudioPath;
 
-//   late VoskFlutterPlugin _vosk;
-//   Recognizer? _recognizer;
-//   SpeechService? _speechService;
-//   final _recorder = AudioRecorder();
-//   String? _fileRecognitionResult;
-//   bool _isListening = false;
-//   bool _isProcessing = false;
-//   Duration? _processingDuration;
-//   late StreamSubscription? _resultSub;
-//   bool speechServiceInitialized = false;
-//   String _fullTranscript = "";
+  Whisper? whisper;
 
-//   @override
-//   void initState() {
-//     super.initState();
+  @override
+  void initState() {
+    super.initState();
+    _copyModelToDocumentsDirectory();
+    _copyAudioToDocumentsDirectory();
 
-//     _vosk = VoskFlutterPlugin.instance();
+    //init whisper
+    _isModelInitialized = false;
+    getApplicationDocumentsDirectory().then((value) {
+      whisper = Whisper(
+        model: WhisperModel.base,
+        modelDir: value.path,
+        // downloadHost: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main", // comment to fully use local model
+      );
+      _isModelInitialized = true;
+    });
+  }
 
-//     ModelLoader().loadFromAssets(_modelPath).then((modelPath) {
-//       _vosk.createModel(modelPath).then((model) {
-//         _vosk
-//             .createRecognizer(
-//           model: model,
-//           sampleRate: _sampleRate,
-//         )
-//             .then((recognizer) {
-//           _recognizer = recognizer;
-//           if (!speechServiceInitialized) {
-//             _vosk.initSpeechService(recognizer).then((speechService) {
-//               debugPrint("Ready");
-//               setState(() {
-//                 _speechService = speechService;
-//                 speechServiceInitialized = true;
-//               });
+  @override
+  void dispose() {
+    _recorder.dispose();
+    super.dispose();
+  }
 
-//               _resultSub = speechService.onResult().listen((json) {
-//                 setState(() {
-//                   if (json.isNotEmpty) {
-//                     final Map<String, dynamic> partialMap =
-//                         jsonDecode(json);
-//                     final text = partialMap['text'] ?? '';
-//                     _fullTranscript += text;
-//                   }
-//                 });
-//               });
-//             });
-//           } else {
-//             debugPrint("SpeechService already initialized");
-//           }
-//         });
-//       });
-//     });
-//   }
+  Future<void> _copyModelToDocumentsDirectory() async {
+    final data = await rootBundle.load('assets/ggml-base.bin');
+    final bytes = data.buffer.asUint8List();
+    final dir = await getApplicationDocumentsDirectory();
+    final filePath = '${dir.path}/ggml-base.bin';
+    await File(filePath).writeAsBytes(bytes);
+  }
 
-//   @override
-//   void dispose() {
-//     _speechService?.cancel();
-//     _speechService?.reset();
-//     _speechService?.dispose();
-//     _recorder.dispose();
-//     _resultSub?.cancel();
-//     _speechService = null;
-//     super.dispose();
-//   }
+  Future<void> _copyAudioToDocumentsDirectory() async {
+    final data = await rootBundle.load('assets/jfk.wav');
+    final bytes = data.buffer.asUint8List();
+    final dir = await getApplicationDocumentsDirectory();
+    _sampleAudioPath = '${dir.path}/jfk.wav';
+    await File(_sampleAudioPath!).writeAsBytes(bytes);
+  }
 
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       appBar: AppBar(
-//         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-//         title: const Text('Vosk Flutter'),
-//       ),
-//       body: _voskSpeechServiceView(),
-//       // body: _manualRecordView(),
-//     );
-//   }
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        title: const Text('Vosk Flutter'),
+      ),
+      body: _manualRecordView(),
+    );
+  }
 
-//   Widget _voskSpeechServiceView() {
-//     return Column(
-//       crossAxisAlignment: CrossAxisAlignment.center,
-//       mainAxisAlignment: MainAxisAlignment.center,
-//       children: [
-//         FilledButton(
-//           onPressed: () {
-//             if (_isListening) {
-//               _speechService?.stop().then((_) {
-//                 setState(() {
-//                   _isListening = false;
-//                 });
-//               });
-//             } else {
-//               _speechService?.start().then((_) {
-//                 setState(() {
-//                   _isListening = true;
-//                 });
-//               });
-//             }
-//           },
-//           child: Text(_isListening ? "Stop recording" : "Record audio"),
-//         ),
-//         SizedBox(
-//           width: double.infinity,
-//           child: StreamBuilder(
-//             stream: _speechService?.onPartial(),
-//             builder: (context, snapshot) => Text(
-//               "Partial result: ${snapshot.data.toString()}",
-//             ),
-//           ),
-//         ),
-//         SizedBox(
-//           width: double.infinity,
-//           child: StreamBuilder(
-//             stream: _speechService?.onResult(),
-//             builder: (context, snapshot) => Text(
-//               "Result: ${snapshot.data.toString()}",
-//             ),
-//           ),
-//         ),
-//       ],
-//     );
-//   }
+  Widget _manualRecordView() {
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                OutlinedButton(
+                  onPressed: () {
+                    _testSampleAudio();
+                  },
+                  child: Text("Test sample"),
+                ),
+                const SizedBox(width: 16),
+                FilledButton(
+                  onPressed: () async {
+                    if (_isListening) {
+                      await _stopRecording();
+                    } else {
+                      try {
+                        await requestMicrophonePermission(); // Request permission
+                        await _recordAudio();
+                      } catch (e) {
+                        debugPrint("error trying to record audio: $e");
+                      }
+                    }
+                    setState(() => _isListening = !_isListening);
+                  },
+                  child: Text(_isListening ? "Stop recording" : "Record audio"),
+                ),
+              ],
+            ),
+            Visibility(
+              visible: _isProcessing,
+              child: const CircularProgressIndicator(),
+            ),
+            Visibility(
+              visible: _fullTranscript != "",
+              child: Text(
+                  "Final recognition result (${_processingDuration?.inMilliseconds} ms): $_fullTranscript"),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-//   Widget _manualRecordView() {
-//     return Scaffold(
-//       body: Center(
-//         child: Column(
-//           mainAxisAlignment: MainAxisAlignment.center,
-//           children: [
-//             FilledButton(
-//               onPressed: () async {
-//                 if (_isListening) {
-//                   final startTime = DateTime.now();
-//                   setState(() {
-//                     _isProcessing = true;
-//                     _processingDuration = null; // reset previous value
-//                   });
+  Future<void> _recordAudio() async {
+    try {
+      debugPrint("start recording");
+      final dir = await getApplicationDocumentsDirectory();
+      final filePath = '${dir.path}/audio.wav';
+      await _recorder.start(
+        const RecordConfig(
+          sampleRate: 16000,
+          encoder: AudioEncoder.wav,
+          numChannels: 1,
+        ),
+        path: filePath,
+      );
+    } catch (e) {
+      debugPrint("error recording audio: $e");
+    }
+  }
 
-//                   await _stopRecording();
+  Future<void> requestMicrophonePermission() async {
+    final status = await Permission.microphone.request();
+    if (status != PermissionStatus.granted) {
+      throw Exception('Microphone permission not granted');
+    }
+  }
 
-//                   final endTime = DateTime.now();
-//                   setState(() {
-//                     _isProcessing = false;
-//                     _processingDuration = endTime.difference(startTime);
-//                   });
-//                 } else {
-//                   await _recordAudio();
-//                 }
-//                 setState(() => _isListening = !_isListening);
-//               },
-//               child: Text(_isListening ? "Stop recording" : "Record audio"),
-//             ),
-//             Visibility(
-//               visible: _isProcessing,
-//               child: const CircularProgressIndicator(),
-//             ),
-//             Visibility(
-//               visible: _fileRecognitionResult != null,
-//               child: Text(
-//                   "Final recognition result (${_processingDuration?.inMilliseconds} ms): $_fileRecognitionResult"),
-//             ),
-//           ],
-//         ),
-//       ),
-//     );
-//   }
+  Future<void> _stopRecording() async {
+    debugPrint("stop recording");
+    try {
+      final startTime = DateTime.now();
+      setState(() {
+        _isProcessing = true;
+        _processingDuration = null; // reset previous value
+        _fullTranscript = "";
+      });
 
-//   Future<void> _recordAudio() async {
-//     try {
-//       final dir = await getApplicationDocumentsDirectory();
-//       final filePath = '${dir.path}/audio.wav';
-//       await _recorder.start(
-//         const RecordConfig(
-//           sampleRate: 16000,
-//           encoder: AudioEncoder.wav,
-//           numChannels: 1,
-//         ),
-//         path: filePath,
-//       );
-//     } catch (e) {
-//       debugPrint("error recording audio: $e");
-//     }
-//   }
+      // use audio recorder
+      final filePath = await _recorder.stop();
 
-//   Future<void> _stopRecording() async {
-//     try {
-//       final filePath = await _recorder.stop();
-//       if (filePath != null) {
-//         final bytes = File(filePath).readAsBytesSync();
-//         _recognizer?.acceptWaveformBytes(bytes);
-//         _fileRecognitionResult = await _recognizer?.getFinalResult();
-//       }
-//     } catch (e) {
-//       debugPrint("error stopping recording: $e");
-//     }
-//   }
-// }
+      debugPrint("filepath: $filePath");
+      if (filePath != null) {
+        final bytes = File(filePath).readAsBytesSync();
+        await File(filePath).writeAsBytes(
+          bytes.buffer.asUint8List(),
+        );
+        final transcription = await whisper?.transcribe(
+          transcribeRequest: TranscribeRequest(
+            audio: filePath,
+            isTranslate: false,
+            isNoTimestamps: false, // Get segments in result
+            splitOnWord: true, // Split segments on each word
+          ),
+        );
+        debugPrint("result: ${transcription?.text}");
+        final endTime = DateTime.now();
+        setState(() {
+          _isProcessing = false;
+          _processingDuration = endTime.difference(startTime);
+          _fullTranscript = transcription?.text ?? "";
+        });
+      }
+    } catch (e) {
+      debugPrint("error stopping recording: $e");
+    }
+  }
+
+  void _testSampleAudio() async {
+    try {
+      debugPrint("test sample audio");
+      final String? filePath = _sampleAudioPath;
+
+      debugPrint("filepath: $filePath");
+      if (filePath != null) {
+        final startTime = DateTime.now();
+        setState(() {
+          _isProcessing = true;
+          _processingDuration = null; // reset previous value
+          _fullTranscript = "";
+        });
+        final transcription = await whisper?.transcribe(
+          transcribeRequest: TranscribeRequest(
+            audio: filePath,
+            isTranslate: false,
+            isNoTimestamps: false,
+            splitOnWord: true,
+          ),
+        );
+        debugPrint("result: ${transcription?.text}");
+        final endTime = DateTime.now();
+        setState(() {
+          _isProcessing = false;
+          _processingDuration = endTime.difference(startTime);
+          _fullTranscript = transcription?.text ?? "";
+        });
+      }
+    } catch (e) {
+      debugPrint("error sample audio: $e");
+    }
+  }
+}

@@ -7,8 +7,8 @@ plugins {
 
 android {
     namespace = "com.example.offline_speech_to_text"
-    compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    compileSdk = 35
+    ndkVersion = "27.0.11902837"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8

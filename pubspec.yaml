@@ -14,14 +14,16 @@ dependencies:
     sdk: flutter
 
   cupertino_icons: ^1.0.8
-  speech_to_text: ^7.0.0
+  # speech_to_text: ^7.0.0
   # vosk_flutter: ^0.3.48
-  # record: ^6.0.0
+  record: ^6.0.0
   # vosk_flutter:
   #   git:
   #       url: https://github.com/alphacep/vosk-flutter.git
   #       ref: master
-  # path_provider: ^2.1.5
+  path_provider: ^2.1.5
+  whisper_flutter_new: ^1.0.1
+  permission_handler: ^12.0.0+1
 
 dev_dependencies:
   flutter_test:
@@ -43,4 +45,3 @@ flutter:
 
   assets:
     - assets/
-    - assets/models/
