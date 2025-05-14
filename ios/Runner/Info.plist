@@ -49,5 +49,7 @@
     <string>This app uses speech recognition to allow you to practice your English speaking skills.</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>This app needs access to your microphone so you can record your voice for practicing English speaking.</string>
+	<key>NSMicrophoneUsageDescription</key>
+    <string>microphone</string>
 </dict>
 </plist>
